@@ -11,12 +11,16 @@
         console.log('[YouTube-Reset]', ...args);
     };
 
+    const STORAGE = chrome.storage.local;
+
     const STORAGE_DEFAULTS = {
         enabled: true,
         showToast: true,
-        toastPosition: 'center',     // left | center | right
-        toastScale: 1.0,             // 0.8 - 1.5
-        toastDurationMs: 2000        // 1000 - 10000
+        toastPosition: 'center',
+        toastScale: 1.0,
+        toastDurationMs: 2000,
+        toastBgColor: '#141414',
+        toastTextColor: '#ffffff'
     };
 
     const TOAST_ID = 'ytr-toast';
@@ -24,73 +28,46 @@
     let lastHandledUrl = '';
     let pendingTimerId = null;
 
-    // OFF/ON切替時に過去イベントが走っても無効化するための世代番号
-    let generation = 0;
+    let isEnabledCache = true;
+    let showToastCache = true;
 
-    const clampInt = (v, min, max) => {
-        const n = Number.parseInt(v, 10);
-        if (Number.isNaN(n)) {
-            return min;
-        }
-        return Math.min(max, Math.max(min, n));
-    };
+    // OFF -> ON 操作時に「再生中なら実行しない」ためのフラグ
+    let wasEnabledCache = true;
 
-    const getSettings = async () => {
+    const loadSettings = async () => {
         try {
-            const data = await chrome.storage.sync.get(STORAGE_DEFAULTS);
-            data.toastDurationMs = clampInt(data.toastDurationMs, 1000, 10000);
-            data.toastScale = Math.min(1.5, Math.max(0.8, Number(data.toastScale)));
-            return data;
-        } catch (e) {
-            return { ...STORAGE_DEFAULTS };
-        }
-    };
+            const data = await STORAGE.get(STORAGE_DEFAULTS);
 
-    const isWatchUrl = (url) => {
-        try {
-            const u = new URL(url);
-            return u.hostname === 'www.youtube.com' && u.pathname === '/watch' && u.searchParams.has('v');
-        } catch (e) {
-            return false;
-        }
-    };
+            wasEnabledCache = isEnabledCache;
 
-    const cancelPending = () => {
-        if (pendingTimerId !== null) {
-            clearTimeout(pendingTimerId);
-            pendingTimerId = null;
+            isEnabledCache = typeof data.enabled === 'boolean' ? data.enabled : true;
+            showToastCache = typeof data.showToast === 'boolean' ? data.showToast : true;
+
+            log('settings loaded', { enabled: isEnabledCache, showToast: showToastCache });
+        } catch (e) {
+            // 読めない場合は安全側
+            wasEnabledCache = true;
+            isEnabledCache = true;
+            showToastCache = true;
+            log('settings load failed, fallback enabled=true', e);
         }
     };
 
     const startStorageListener = () => {
         chrome.storage.onChanged.addListener((changes, areaName) => {
-            if (areaName !== 'sync' && areaName !== 'local') {
-                return;
-            }
-            if (!changes.enabled) {
-                // toast設定だけの変更もあるため，enabled以外は無視しない
-            }
-
-            // 切替が入ったら世代を進めて過去イベントを無効化
-            if (changes.enabled || changes.showToast || changes.toastPosition || changes.toastScale || changes.toastDurationMs) {
-                generation += 1;
-            }
-
-            // OFFになったら予約済み処理をキャンセル
-            if (changes.enabled && changes.enabled.newValue === false) {
-                cancelPending();
-                log('disabled: cancel pending', { areaName });
+            if (areaName !== 'local') {
                 return;
             }
 
-            // ver 1.2.1 以降：動画再生中に OFF -> ON したとき，その動画には実行しない
-            if (changes.enabled && changes.enabled.oldValue === false && changes.enabled.newValue === true) {
-                const currentUrl = location.href;
-                if (isWatchUrl(currentUrl)) {
-                    lastHandledUrl = currentUrl;
-                    cancelPending();
-                    log('OFF->ON: skip current watch', { currentUrl });
-                }
+            if (changes.enabled) {
+                wasEnabledCache = isEnabledCache;
+                isEnabledCache = changes.enabled.newValue;
+                log('enabled changed', { before: wasEnabledCache, after: isEnabledCache });
+            }
+
+            if (changes.showToast) {
+                showToastCache = changes.showToast.newValue;
+                log('showToast changed', { showToast: showToastCache });
             }
         });
     };
@@ -111,7 +88,15 @@
         return el;
     };
 
-    const applyToastStyle = (el, settings) => {
+    const showToast = (message, settings) => {
+        if (!showToastCache) {
+            return;
+        }
+
+        const el = ensureToastElement();
+        el.textContent = message;
+
+        // 位置
         if (settings.toastPosition === 'left') {
             el.style.left = '18px';
             el.style.right = 'auto';
@@ -126,18 +111,10 @@
             el.style.setProperty('--ytr-x', '-50%');
         }
 
+        // 大きさ・色
         el.style.setProperty('--ytr-scale', String(settings.toastScale));
-    };
-
-    const showToast = (message, settings) => {
-        if (!settings.showToast) {
-            return;
-        }
-
-        const el = ensureToastElement();
-        el.textContent = message;
-
-        applyToastStyle(el, settings);
+        el.style.setProperty('--ytr-bg', settings.toastBgColor);
+        el.style.setProperty('--ytr-fg', settings.toastTextColor);
 
         el.classList.add('ytr-toast--show');
 
@@ -151,6 +128,15 @@
         }, settings.toastDurationMs);
     };
 
+    const isWatchUrl = (url) => {
+        try {
+            const u = new URL(url);
+            return u.hostname === 'www.youtube.com' && u.pathname === '/watch' && u.searchParams.has('v');
+        } catch (e) {
+            return false;
+        }
+    };
+
     const waitForVideoElement = async (timeoutMs) => {
         const start = Date.now();
 
@@ -161,12 +147,12 @@
             }
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
+
         return null;
     };
 
     const resetToZeroSafely = async (reason) => {
-        const settings = await getSettings();
-        if (!settings.enabled) {
+        if (!isEnabledCache) {
             log('disabled - skip', { reason, url: location.href });
             return;
         }
@@ -178,6 +164,16 @@
             return;
         }
 
+        // OFF -> ON の瞬間は「再生中なら実行しない」
+        if (!wasEnabledCache && isEnabledCache) {
+            const currentVideo = document.querySelector('video');
+            if (currentVideo && !currentVideo.paused && !currentVideo.ended) {
+                log('skip (OFF->ON while playing)', { url, reason });
+                lastHandledUrl = url;
+                return;
+            }
+        }
+
         if (url === lastHandledUrl) {
             log('skip (already handled)', { url, reason });
             return;
@@ -186,7 +182,7 @@
         lastHandledUrl = url;
         log('handle', { url, reason });
 
-        const currentGeneration = generation;
+        const settings = await STORAGE.get(STORAGE_DEFAULTS);
 
         const video = await waitForVideoElement(10000);
         if (!video) {
@@ -196,27 +192,14 @@
 
         let toastShown = false;
 
-        const tryReset = async (tag) => {
-            // 途中で設定が切り替わっていたら無効化
-            if (currentGeneration !== generation) {
-                log('generation changed - skip', { tag });
-                return;
-            }
-
-            // 実行直前にも enabled を再確認（OFFでも実行される問題の対策）
-            const latest = await getSettings();
-            if (!latest.enabled) {
-                log('disabled before apply - skip', { tag });
-                return;
-            }
-
+        const tryReset = (tag) => {
             try {
                 video.currentTime = 0;
                 log('reset currentTime=0', { tag });
 
                 if (!toastShown) {
                     toastShown = true;
-                    showToast('実行完了しました', latest);
+                    showToast('実行完了しました', settings);
                 }
             } catch (e) {
                 log('reset failed', { tag, e });
@@ -239,8 +222,9 @@
     };
 
     const scheduleHandle = (reason) => {
-        cancelPending();
-
+        if (pendingTimerId !== null) {
+            clearTimeout(pendingTimerId);
+        }
         pendingTimerId = setTimeout(() => {
             pendingTimerId = null;
             resetToZeroSafely(reason);
@@ -284,6 +268,7 @@
     };
 
     const init = async () => {
+        await loadSettings();
         startStorageListener();
 
         hookHistoryApi();

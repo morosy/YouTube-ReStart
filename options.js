@@ -1,6 +1,9 @@
 (() => {
     'use strict';
 
+    // storage.sync は quota が厳しいため，local を使用
+    const STORAGE = chrome.storage.local;
+
     const DEFAULTS = {
         enabled: true,
         showToast: true,
@@ -56,10 +59,8 @@
     };
 
     let saveToastTimerId = null;
-
-    // ロード直後は未保存ではない
-    let hasLoaded = false;
-    let isDirty = false;
+    let lastSavedPayloadStr = '';
+    let isSaving = false;
 
     const clampInt = (v, min, max) => {
         const n = Number.parseInt(v, 10);
@@ -79,22 +80,6 @@
 
     const isValidHexColor = (value) => {
         return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
-    };
-
-    const setDirty = (dirty) => {
-        isDirty = dirty;
-
-        if (!hasLoaded) {
-            els.unsavedDot.classList.remove('is-visible');
-            return;
-        }
-
-        if (isDirty) {
-            els.unsavedDot.classList.add('is-visible');
-            return;
-        }
-
-        els.unsavedDot.classList.remove('is-visible');
     };
 
     const updateEnabledLook = () => {
@@ -130,11 +115,11 @@
         el.setAttribute('role', 'status');
         el.setAttribute('aria-live', 'polite');
 
+        // 保存通知は常に中央上部
         el.style.left = '50%';
         el.style.right = 'auto';
         el.style.setProperty('--ytr-x', '-50%');
         el.style.setProperty('--ytr-scale', '1');
-
         el.style.setProperty('--ytr-bg', 'rgba(20, 20, 20, 0.92)');
         el.style.setProperty('--ytr-fg', '#ffffff');
 
@@ -192,6 +177,38 @@
         };
     };
 
+    const normalizePayloadFromStorage = (data) => {
+        const seconds = clampInt(Math.round(clampInt(data.toastDurationMs, 1000, 10000) / 1000), 1, 10);
+
+        return {
+            enabled: typeof data.enabled === 'boolean' ? data.enabled : DEFAULTS.enabled,
+            showToast: typeof data.showToast === 'boolean' ? data.showToast : DEFAULTS.showToast,
+            toastPosition: data.toastPosition || DEFAULTS.toastPosition,
+            toastScale: clampFloat(data.toastScale, 0.8, 1.5),
+            toastDurationMs: seconds * 1000,
+            toastBgColor: isValidHexColor(data.toastBgColor) ? data.toastBgColor : DEFAULTS.toastBgColor,
+            toastTextColor: isValidHexColor(data.toastTextColor) ? data.toastTextColor : DEFAULTS.toastTextColor
+        };
+    };
+
+    const updateUnsavedIndicator = () => {
+        const currentStr = JSON.stringify(collectPayloadFromUi());
+        const isDirty = (currentStr !== lastSavedPayloadStr);
+
+        // options.html 側で dot が hidden 属性の場合に対応
+        if (els.unsavedDot.hasAttribute('hidden')) {
+            els.unsavedDot.hidden = !isDirty;
+            return;
+        }
+
+        // class 運用の場合にも対応
+        if (isDirty) {
+            els.unsavedDot.classList.add('is-visible');
+            return;
+        }
+        els.unsavedDot.classList.remove('is-visible');
+    };
+
     const applyDurationInputToRange = () => {
         const seconds = clampInt(els.toastDurationInput.value, 1, 10);
         els.toastDurationInput.value = String(seconds);
@@ -237,15 +254,9 @@
         }, settings.toastDurationMs);
     };
 
-    const markDirtyByUserAction = () => {
-        if (!hasLoaded) {
-            return;
-        }
-        setDirty(true);
-    };
-
     const load = async () => {
-        const data = await chrome.storage.sync.get(DEFAULTS);
+        const raw = await STORAGE.get(DEFAULTS);
+        const data = normalizePayloadFromStorage(raw);
 
         els.enabled.checked = data.enabled;
         updateEnabledLook();
@@ -255,69 +266,68 @@
 
         els.toastPosition.value = data.toastPosition;
 
-        els.toastScale.value = String(clampFloat(data.toastScale, 0.8, 1.5));
+        els.toastScale.value = String(data.toastScale);
         updateScaleLabel();
 
-        const seconds = clampInt(Math.round(clampInt(data.toastDurationMs, 1000, 10000) / 1000), 1, 10);
-        els.toastDuration.value = String(seconds);
-        els.toastDurationInput.value = String(seconds);
+        els.toastDuration.value = String(data.toastDurationMs / 1000);
+        els.toastDurationInput.value = String(data.toastDurationMs / 1000);
 
-        els.toastBgColor.value = isValidHexColor(data.toastBgColor) ? data.toastBgColor : DEFAULTS.toastBgColor;
-        els.toastTextColor.value = isValidHexColor(data.toastTextColor) ? data.toastTextColor : DEFAULTS.toastTextColor;
+        els.toastBgColor.value = data.toastBgColor;
+        els.toastTextColor.value = data.toastTextColor;
         updateColorLabels();
 
         renderPresetButtons(els.bgPresets, BG_PRESETS, (color) => {
             els.toastBgColor.value = color;
             updateColorLabels();
-            markDirtyByUserAction();
+            updateUnsavedIndicator();
         });
 
         renderPresetButtons(els.fgPresets, FG_PRESETS, (color) => {
             els.toastTextColor.value = color;
             updateColorLabels();
-            markDirtyByUserAction();
+            updateUnsavedIndicator();
         });
 
-        hasLoaded = true;
-        setDirty(false);
+        lastSavedPayloadStr = JSON.stringify(data);
+        updateUnsavedIndicator();
     };
 
-    // UIイベント：変更時に未保存 표시（保存はボタンのみ）
+    // 変更で未保存表示を更新（保存はボタンのみ）
     els.enabled.addEventListener('change', () => {
         updateEnabledLook();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
     els.showToast.addEventListener('change', () => {
         updateDetailsVisibility();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
-    els.toastPosition.addEventListener('change', markDirtyByUserAction);
+    els.toastPosition.addEventListener('change', updateUnsavedIndicator);
 
     els.toastScale.addEventListener('input', () => {
         updateScaleLabel();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
     els.toastDuration.addEventListener('input', () => {
         applyRangeToDurationInput();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
     els.toastDurationInput.addEventListener('input', () => {
         applyDurationInputToRange();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
     els.toastBgColor.addEventListener('input', () => {
         updateColorLabels();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
     els.toastTextColor.addEventListener('input', () => {
         updateColorLabels();
-        markDirtyByUserAction();
+        updateUnsavedIndicator();
     });
 
     els.previewToast.addEventListener('click', () => {
@@ -325,11 +335,28 @@
         createPreviewToast(payload);
     });
 
+    // 保存（local なので quota 問題を回避できる）
     els.saveSettings.addEventListener('click', async () => {
-        const payload = collectPayloadFromUi();
-        await chrome.storage.sync.set(payload);
-        showSaveToast();
-        setDirty(false);
+        if (isSaving) {
+            return;
+        }
+
+        isSaving = true;
+        els.saveSettings.disabled = true;
+
+        try {
+            const payload = collectPayloadFromUi();
+            await STORAGE.set(payload);
+
+            lastSavedPayloadStr = JSON.stringify(payload);
+            updateUnsavedIndicator();
+            showSaveToast();
+        } finally {
+            window.setTimeout(() => {
+                els.saveSettings.disabled = false;
+                isSaving = false;
+            }, 350);
+        }
     });
 
     load();

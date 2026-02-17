@@ -233,7 +233,6 @@ body {
     color: #ffffff;
 }
 
-/* 追加：プレビューボタンを左右中央揃え */
 #previewToast {
     display: block;
     margin: 10px auto 0;
@@ -243,13 +242,25 @@ body {
     margin-top: 18px;
     display: flex;
     justify-content: center;
+}
+
+.save-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#saveSettings {
+    display: inline-flex;
     align-items: center;
     gap: 10px;
 }
 
 .dirty-dot {
-    font-size: 18px;
-    line-height: 1;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: #ff0033;
     opacity: 0;
     transition: 120ms;
 }

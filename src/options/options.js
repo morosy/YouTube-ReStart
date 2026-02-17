@@ -29,6 +29,17 @@
         textColorHistory: [...TEMPLATE_COLORS]
     };
 
+    // 追加：初期化ボタンで適用する初期設定（要件準拠）
+    const RESET_DEFAULTS = {
+        showToast: true,
+        toastPosition: 'center',
+        toastAnimationEnabled: true,
+        toastTextColor: '#ffffff',
+        toastBgColor: '#ff0033',
+        toastAnimationDurationMs: 500,
+        toastScale: 1.0
+    };
+
     const els = {
         enabled: document.getElementById('enabled'),
         showToast: document.getElementById('showToast'),
@@ -59,14 +70,13 @@
 
         previewToast: document.getElementById('previewToast'),
         saveSettings: document.getElementById('saveSettings'),
+        resetSettings: document.getElementById('resetSettings'),
 
         dirtyDot: document.getElementById('dirtyDot'),
         saveToast: document.getElementById('saveToast'),
 
         disabledMaskTarget: document.getElementById('disabledMaskTarget'),
         toastDetailArea: document.getElementById('toastDetailArea'),
-
-        // 追加：カラー設定ブロック
         colorSettingsBlock: document.getElementById('colorSettingsBlock')
     };
 
@@ -327,7 +337,7 @@
             showToast: !!data.showToast,
 
             toastPosition: data.toastPosition || 'center',
-            toastScale: typeof data.toastScale === 'number' ? data.toastScale : 1.5,
+            toastScale: typeof data.toastScale === 'number' ? data.toastScale : STORAGE_DEFAULTS.toastScale,
             toastDurationMs: typeof data.toastDurationMs === 'number' ? data.toastDurationMs : 2000,
 
             toastBgColor: normalizeColor(data.toastBgColor) || STORAGE_DEFAULTS.toastBgColor,
@@ -399,6 +409,39 @@
         showSaveToast('設定を保存しました');
     };
 
+    const resetSettings = async () => {
+        const ok = window.confirm('警告：設定を初期化しますか？');
+        if (!ok) {
+            return;
+        }
+
+        if (!draft) {
+            return;
+        }
+
+        draft.showToast = RESET_DEFAULTS.showToast;
+        draft.toastPosition = RESET_DEFAULTS.toastPosition;
+        draft.toastAnimationEnabled = RESET_DEFAULTS.toastAnimationEnabled;
+        draft.toastTextColor = RESET_DEFAULTS.toastTextColor;
+        draft.toastBgColor = RESET_DEFAULTS.toastBgColor;
+        draft.toastAnimationDurationMs = RESET_DEFAULTS.toastAnimationDurationMs;
+        draft.toastScale = RESET_DEFAULTS.toastScale;
+
+        // 表示時間は要件に無いので維持（必要なら初期化対象に含める）
+        // draft.toastDurationMs = 2000;
+
+        // カラー履歴も初期化したい場合は以下を有効化
+        // draft.bgColorHistory = [...TEMPLATE_COLORS];
+        // draft.textColorHistory = [...TEMPLATE_COLORS];
+
+        await STORAGE.set(buildSavePayload());
+
+        setDirty(false);
+        syncUiFromDraft();
+
+        showSaveToast('設定を初期化しました');
+    };
+
     const preview = () => {
         if (!draft) {
             return;
@@ -409,6 +452,8 @@
         toast.style.position = 'fixed';
         toast.style.top = '18px';
         toast.style.zIndex = '2147483647';
+
+        // 重要：toast.css のベースと一致させる（最小修正）
         toast.style.padding = '18px 22px';
         toast.style.borderRadius = '16px';
         toast.style.fontSize = '18px';
@@ -416,6 +461,7 @@
         toast.style.minWidth = '320px';
         toast.style.textAlign = 'center';
         toast.style.boxShadow = '0 12px 34px rgba(0, 0, 0, 0.38)';
+
         toast.style.background = draft.toastBgColor;
         toast.style.color = draft.toastTextColor;
 
@@ -587,6 +633,12 @@
         if (els.saveSettings) {
             els.saveSettings.addEventListener('click', () => {
                 save();
+            });
+        }
+
+        if (els.resetSettings) {
+            els.resetSettings.addEventListener('click', () => {
+                resetSettings();
             });
         }
     };

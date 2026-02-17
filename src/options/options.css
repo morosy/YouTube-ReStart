@@ -269,6 +269,12 @@ body {
     opacity: 1;
 }
 
+.reset-row {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+}
+
 .footer {
     margin-top: 14px;
     text-align: center;

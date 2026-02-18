@@ -87,6 +87,8 @@
         // Advanced
         customCss: document.getElementById('customCss'),
         exportSettings: document.getElementById('exportSettings'),
+        importSettings: document.getElementById('importSettings'),
+        importFile: document.getElementById('importFile'),
 
         // Footer actions
         saveSettings: document.getElementById('saveSettings'),
@@ -569,6 +571,71 @@
         });
     };
 
+    const importSettings = async () => {
+        if (!els.importFile) {
+            return;
+        }
+
+        // ファイル選択ダイアログを表示
+        els.importFile.click();
+    };
+
+    const handleImportFile = async (file) => {
+        if (!file) {
+            return;
+        }
+
+        // ファイル形式の確認
+        if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+            showSaveToast('このファイルには対応していません');
+            return;
+        }
+
+        try {
+            const text = await file.text();
+            const payload = JSON.parse(text);
+
+            // 最小限の検証：必須フィールドが存在するか
+            const requiredFields = ['enabled', 'showToast', 'toastPosition', 'toastScale', 'toastDurationMs'];
+            const hasRequiredFields = requiredFields.every(field => field in payload);
+
+            if (!hasRequiredFields) {
+                showSaveToast('このファイルには対応していません');
+                return;
+            }
+
+            // draft に新しい設定をマージ
+            if (!draft) {
+                return;
+            }
+
+            draft.enabled = !!payload.enabled;
+            draft.showToast = !!payload.showToast;
+            draft.toastPosition = payload.toastPosition || 'center';
+            draft.toastScale = typeof payload.toastScale === 'number' ? payload.toastScale : 1.5;
+            draft.toastDurationMs = typeof payload.toastDurationMs === 'number' ? payload.toastDurationMs : 2000;
+            draft.toastBgColor = normalizeColor(payload.toastBgColor) || draft.toastBgColor;
+            draft.toastTextColor = normalizeColor(payload.toastTextColor) || draft.toastTextColor;
+            draft.toastAnimationEnabled = typeof payload.toastAnimationEnabled === 'boolean' ? payload.toastAnimationEnabled : true;
+            draft.toastAnimationDurationMs = typeof payload.toastAnimationDurationMs === 'number' ? payload.toastAnimationDurationMs : 500;
+            draft.bgColorHistory = ensureHistoryArray(payload.bgColorHistory);
+            draft.textColorHistory = ensureHistoryArray(payload.textColorHistory);
+            draft.customCss = typeof payload.customCss === 'string' ? payload.customCss : '';
+
+            // UI に反映
+            setDirty(true);
+            syncUiFromDraft();
+
+            showSaveToast('読み込みが完了しました');
+        } catch (e) {
+            console.error('Import error:', e);
+            showSaveToast('このファイルには対応していません');
+        }
+
+        // ファイル入力をリセット
+        els.importFile.value = '';
+    };
+
     const exportSettings = async () => {
         if (!draft) {
             return;
@@ -577,20 +644,41 @@
         const payload = buildSavePayload();
         const json = JSON.stringify(payload, null, 4);
 
-        try {
-            await navigator.clipboard.writeText(json);
-            showSaveToast('クリップボードにコピーしました');
-            return;
-        } catch (e) {
-            // clipboard が使えない場合のフォールバック
+        // File System Access API を使用（Chrome 86+）
+        if (typeof window.showSaveFilePicker === 'function') {
+            try {
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: 'ytr.json',
+                    types: [
+                        {
+                            description: 'JSON Files',
+                            accept: { 'application/json': ['.json'] }
+                        }
+                    ]
+                });
+
+                const writable = await fileHandle.createWritable();
+                await writable.write(json);
+                await writable.close();
+
+                showSaveToast('設定を書き出しました');
+                return;
+            } catch (e) {
+                // ユーザーがキャンセルした場合など
+                if (e.name !== 'AbortError') {
+                    console.error('File save error:', e);
+                }
+                return;
+            }
         }
 
+        // フォールバック：ダウンロード
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'youtube-restarter-settings.json';
+        a.download = 'ytr.json';
         a.click();
 
         setTimeout(() => {
@@ -805,6 +893,21 @@
         if (els.exportSettings) {
             els.exportSettings.addEventListener('click', () => {
                 exportSettings();
+            });
+        }
+
+        if (els.importSettings) {
+            els.importSettings.addEventListener('click', () => {
+                importSettings();
+            });
+        }
+
+        if (els.importFile) {
+            els.importFile.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) {
+                    handleImportFile(file);
+                }
             });
         }
 

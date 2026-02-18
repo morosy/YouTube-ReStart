@@ -303,6 +303,12 @@ body {
     color: #ffffff;
 }
 
+.btn-center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 #previewToast {
     display: block;
     margin: 10px auto 0;
@@ -371,6 +377,18 @@ body {
 
 .save-toast.is-show {
     opacity: 1;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* Switch */

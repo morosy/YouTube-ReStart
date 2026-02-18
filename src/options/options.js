@@ -77,7 +77,9 @@
 
         disabledMaskTarget: document.getElementById('disabledMaskTarget'),
         toastDetailArea: document.getElementById('toastDetailArea'),
-        colorSettingsBlock: document.getElementById('colorSettingsBlock')
+        colorSettingsBlock: document.getElementById('colorSettingsBlock'),
+
+        saveLabel: document.getElementById('saveLabel')
     };
 
     let draft = null;
@@ -643,8 +645,42 @@
         }
     };
 
+    const getSaveShortcutText = () => {
+        const isMac = navigator.platform.toLowerCase().includes('mac');
+        return isMac ? '⌘+S' : 'Ctrl+S';
+    };
+
+    const applySaveButtonLabel = () => {
+        if (!els.saveLabel) {
+            return;
+        }
+        els.saveLabel.textContent = `設定を保存 ${getSaveShortcutText()}`;
+    };
+
+    const bindSaveShortcut = () => {
+        window.addEventListener('keydown', async (e) => {
+            const key = String(e.key || '').toLowerCase();
+            const isMac = navigator.platform.toLowerCase().includes('mac');
+
+            const isSave = key === 's' && (isMac ? e.metaKey : e.ctrlKey);
+            if (!isSave) {
+                return;
+            }
+
+            if (e.repeat) {
+                return;
+            }
+
+            e.preventDefault();
+
+            await save();
+        });
+    };
+
     const init = async () => {
         bindEvents();
+        bindSaveShortcut();
+        applySaveButtonLabel();
         await load();
     };
 

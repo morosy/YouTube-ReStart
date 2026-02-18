@@ -124,7 +124,6 @@ body {
     text-align: center;
 }
 
-/* 区切り線（実線・点線）を削除するため，border を付けない */
 .detail {
     margin-top: 10px;
     padding-top: 10px;
@@ -244,12 +243,6 @@ body {
     justify-content: center;
 }
 
-.save-inner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
 #saveSettings {
     display: inline-flex;
     align-items: center;
@@ -261,18 +254,11 @@ body {
     height: 12px;
     border-radius: 999px;
     background: #ff0033;
-    opacity: 0;
-    transition: 120ms;
+    display: none;
 }
 
 .dirty-dot.is-dirty {
-    opacity: 1;
-}
-
-.reset-row {
-    margin-top: 12px;
-    display: flex;
-    justify-content: center;
+    display: inline-block;
 }
 
 .footer {

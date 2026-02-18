@@ -26,10 +26,11 @@
         toastAnimationDurationMs: 500,
 
         bgColorHistory: [...TEMPLATE_COLORS],
-        textColorHistory: [...TEMPLATE_COLORS]
+        textColorHistory: [...TEMPLATE_COLORS],
+
+        customCss: ''
     };
 
-    // 追加：初期化ボタンで適用する初期設定（要件準拠）
     const RESET_DEFAULTS = {
         showToast: true,
         toastPosition: 'center',
@@ -41,9 +42,20 @@
     };
 
     const els = {
-        enabled: document.getElementById('enabled'),
-        showToast: document.getElementById('showToast'),
+        // Tabs
+        tabBasic: document.getElementById('tabBasic'),
+        tabPopup: document.getElementById('tabPopup'),
+        tabAdvanced: document.getElementById('tabAdvanced'),
 
+        panelBasic: document.getElementById('panelBasic'),
+        panelPopup: document.getElementById('panelPopup'),
+        panelAdvanced: document.getElementById('panelAdvanced'),
+
+        // Basic
+        enabled: document.getElementById('enabled'),
+
+        // Popup
+        showToast: document.getElementById('showToast'),
         toastPosition: document.getElementById('toastPosition'),
         toastScale: document.getElementById('toastScale'),
         toastScaleValue: document.getElementById('toastScaleValue'),
@@ -56,34 +68,37 @@
         toastAnimationDuration: document.getElementById('toastAnimationDuration'),
         toastAnimationDurationValue: document.getElementById('toastAnimationDurationValue'),
 
+        toastDetailArea: document.getElementById('toastDetailArea'),
+        colorSettingsBlock: document.getElementById('colorSettingsBlock'),
+        disabledMaskTarget: document.getElementById('disabledMaskTarget'),
+
+        // Color
         bgPalette: document.getElementById('bgPalette'),
         textPalette: document.getElementById('textPalette'),
-
         bgPicker: document.getElementById('bgPicker'),
         textPicker: document.getElementById('textPicker'),
-
         bgPickApply: document.getElementById('bgPickApply'),
         textPickApply: document.getElementById('textPickApply'),
-
         bgColorValue: document.getElementById('bgColorValue'),
         textColorValue: document.getElementById('textColorValue'),
 
         previewToast: document.getElementById('previewToast'),
+
+        // Advanced
+        customCss: document.getElementById('customCss'),
+        exportSettings: document.getElementById('exportSettings'),
+
+        // Footer actions
         saveSettings: document.getElementById('saveSettings'),
         resetSettings: document.getElementById('resetSettings'),
-
         dirtyDot: document.getElementById('dirtyDot'),
         saveToast: document.getElementById('saveToast'),
-
-        disabledMaskTarget: document.getElementById('disabledMaskTarget'),
-        toastDetailArea: document.getElementById('toastDetailArea'),
-        colorSettingsBlock: document.getElementById('colorSettingsBlock'),
-
         saveLabel: document.getElementById('saveLabel')
     };
 
     let draft = null;
     let saveToastTimerId = null;
+    let activeTabKey = 'basic';
 
     const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
@@ -100,12 +115,19 @@
         return null;
     };
 
-    const setDirty = (dirty) => {
-        if (!els.dirtyDot) {
+    const isMac = () => {
+        const p = String(navigator.platform || '').toLowerCase();
+        const ua = String(navigator.userAgent || '').toLowerCase();
+        return p.includes('mac') || ua.includes('mac os');
+    };
+
+    const setSaveLabel = () => {
+        if (!els.saveLabel) {
             return;
         }
 
-        els.dirtyDot.classList.toggle('is-dirty', !!dirty);
+        const suffix = isMac() ? '⌘+S' : 'Ctrl+S';
+        els.saveLabel.textContent = `設定を保存 ${suffix}`;
     };
 
     const showSaveToast = (message) => {
@@ -124,6 +146,14 @@
             els.saveToast.classList.remove('is-show');
             saveToastTimerId = null;
         }, 2000);
+    };
+
+    const setDirty = (dirty) => {
+        if (!els.dirtyDot) {
+            return;
+        }
+
+        els.dirtyDot.classList.toggle('is-dirty', !!dirty);
     };
 
     const applyEnabledMask = () => {
@@ -273,9 +303,11 @@
         if (els.enabled) {
             els.enabled.checked = !!draft.enabled;
         }
+
         if (els.showToast) {
             els.showToast.checked = !!draft.showToast;
         }
+
         if (els.toastPosition) {
             els.toastPosition.value = draft.toastPosition || 'center';
         }
@@ -286,11 +318,12 @@
             els.toastScale.step = '0.05';
             els.toastScale.value = String(draft.toastScale);
         }
+
         if (els.toastScaleValue) {
             els.toastScaleValue.textContent = String(Number(draft.toastScale).toFixed(2));
         }
 
-        const durationSec = clamp(Math.round(draft.toastDurationMs / 1000), 1, 10);
+        const durationSec = clamp(Math.round(Number(draft.toastDurationMs) / 1000), 1, 10);
         if (els.toastDuration) {
             els.toastDuration.value = String(durationSec);
         }
@@ -325,6 +358,10 @@
             els.toastAnimationDurationValue.textContent = String(draft.toastAnimationDurationMs);
         }
 
+        if (els.customCss) {
+            els.customCss.value = String(draft.customCss || '');
+        }
+
         applyEnabledMask();
         applyToastDetailVisibility();
         applyAnimationSettingsVisibility();
@@ -340,21 +377,23 @@
 
             toastPosition: data.toastPosition || 'center',
             toastScale: typeof data.toastScale === 'number' ? data.toastScale : STORAGE_DEFAULTS.toastScale,
-            toastDurationMs: typeof data.toastDurationMs === 'number' ? data.toastDurationMs : 2000,
+            toastDurationMs: typeof data.toastDurationMs === 'number' ? data.toastDurationMs : STORAGE_DEFAULTS.toastDurationMs,
 
             toastBgColor: normalizeColor(data.toastBgColor) || STORAGE_DEFAULTS.toastBgColor,
             toastTextColor: normalizeColor(data.toastTextColor) || STORAGE_DEFAULTS.toastTextColor,
 
             toastAnimationEnabled: typeof data.toastAnimationEnabled === 'boolean'
                 ? data.toastAnimationEnabled
-                : true,
+                : STORAGE_DEFAULTS.toastAnimationEnabled,
 
             toastAnimationDurationMs: typeof data.toastAnimationDurationMs === 'number'
                 ? data.toastAnimationDurationMs
-                : 500,
+                : STORAGE_DEFAULTS.toastAnimationDurationMs,
 
             bgColorHistory: ensureHistoryArray(data.bgColorHistory),
-            textColorHistory: ensureHistoryArray(data.textColorHistory)
+            textColorHistory: ensureHistoryArray(data.textColorHistory),
+
+            customCss: typeof data.customCss === 'string' ? data.customCss : ''
         };
 
         draft.toastScale = clamp(Number(draft.toastScale), 0.5, 2.0);
@@ -397,7 +436,9 @@
             ),
 
             bgColorHistory: draft.bgColorHistory.slice(0, 10),
-            textColorHistory: draft.textColorHistory.slice(0, 10)
+            textColorHistory: draft.textColorHistory.slice(0, 10),
+
+            customCss: String(draft.customCss || '')
         };
     };
 
@@ -429,13 +470,6 @@
         draft.toastAnimationDurationMs = RESET_DEFAULTS.toastAnimationDurationMs;
         draft.toastScale = RESET_DEFAULTS.toastScale;
 
-        // 表示時間は要件に無いので維持（必要なら初期化対象に含める）
-        // draft.toastDurationMs = 2000;
-
-        // カラー履歴も初期化したい場合は以下を有効化
-        // draft.bgColorHistory = [...TEMPLATE_COLORS];
-        // draft.textColorHistory = [...TEMPLATE_COLORS];
-
         await STORAGE.set(buildSavePayload());
 
         setDirty(false);
@@ -455,7 +489,7 @@
         toast.style.top = '18px';
         toast.style.zIndex = '2147483647';
 
-        // 重要：toast.css のベースと一致させる（最小修正）
+        // toast.css と「同等の見え方」を保つ前提（必要最小限）
         toast.style.padding = '18px 22px';
         toast.style.borderRadius = '16px';
         toast.style.fontSize = '18px';
@@ -503,9 +537,101 @@
         }, 1500);
     };
 
+    const activateTab = (tabKey) => {
+        activeTabKey = tabKey;
+
+        const tabButtons = [
+            { key: 'basic', el: els.tabBasic },
+            { key: 'popup', el: els.tabPopup },
+            { key: 'advanced', el: els.tabAdvanced }
+        ];
+
+        const panels = [
+            { key: 'basic', el: els.panelBasic },
+            { key: 'popup', el: els.panelPopup },
+            { key: 'advanced', el: els.panelAdvanced }
+        ];
+
+        tabButtons.forEach((t) => {
+            if (!t.el) {
+                return;
+            }
+            const active = t.key === tabKey;
+            t.el.classList.toggle('is-active', active);
+            t.el.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        panels.forEach((p) => {
+            if (!p.el) {
+                return;
+            }
+            p.el.classList.toggle('is-active', p.key === tabKey);
+        });
+    };
+
+    const exportSettings = async () => {
+        if (!draft) {
+            return;
+        }
+
+        const payload = buildSavePayload();
+        const json = JSON.stringify(payload, null, 4);
+
+        try {
+            await navigator.clipboard.writeText(json);
+            showSaveToast('クリップボードにコピーしました');
+            return;
+        } catch (e) {
+            // clipboard が使えない場合のフォールバック
+        }
+
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'youtube-restarter-settings.json';
+        a.click();
+
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+        }, 2000);
+
+        showSaveToast('設定を書き出しました');
+    };
+
+    const bindTabEvents = () => {
+        const handler = (e) => {
+            const btn = e.currentTarget;
+            if (!btn) {
+                return;
+            }
+
+            const key = btn.dataset.tab;
+            if (!key) {
+                return;
+            }
+
+            activateTab(key);
+        };
+
+        if (els.tabBasic) {
+            els.tabBasic.addEventListener('click', handler);
+        }
+        if (els.tabPopup) {
+            els.tabPopup.addEventListener('click', handler);
+        }
+        if (els.tabAdvanced) {
+            els.tabAdvanced.addEventListener('click', handler);
+        }
+    };
+
     const bindEvents = () => {
         if (els.enabled) {
             els.enabled.addEventListener('change', () => {
+                if (!draft) {
+                    return;
+                }
                 draft.enabled = !!els.enabled.checked;
                 setDirty(true);
                 applyEnabledMask();
@@ -514,6 +640,9 @@
 
         if (els.showToast) {
             els.showToast.addEventListener('change', () => {
+                if (!draft) {
+                    return;
+                }
                 draft.showToast = !!els.showToast.checked;
                 setDirty(true);
                 applyToastDetailVisibility();
@@ -522,6 +651,9 @@
 
         if (els.toastPosition) {
             els.toastPosition.addEventListener('change', () => {
+                if (!draft) {
+                    return;
+                }
                 draft.toastPosition = els.toastPosition.value;
                 setDirty(true);
             });
@@ -529,6 +661,10 @@
 
         if (els.toastScale) {
             els.toastScale.addEventListener('input', () => {
+                if (!draft) {
+                    return;
+                }
+
                 const v = Number(els.toastScale.value);
                 draft.toastScale = clamp(v, 0.5, 2.0);
 
@@ -542,6 +678,10 @@
 
         if (els.toastDuration) {
             els.toastDuration.addEventListener('input', () => {
+                if (!draft) {
+                    return;
+                }
+
                 const sec = clamp(Number(els.toastDuration.value), 1, 10);
                 draft.toastDurationMs = sec * 1000;
 
@@ -555,6 +695,10 @@
 
         if (els.toastDurationText) {
             els.toastDurationText.addEventListener('change', () => {
+                if (!draft) {
+                    return;
+                }
+
                 const sec = clamp(Number(els.toastDurationText.value), 1, 10);
                 draft.toastDurationMs = sec * 1000;
 
@@ -569,6 +713,10 @@
 
         if (els.toastAnimationEnabled) {
             els.toastAnimationEnabled.addEventListener('change', () => {
+                if (!draft) {
+                    return;
+                }
+
                 draft.toastAnimationEnabled = !!els.toastAnimationEnabled.checked;
                 setDirty(true);
                 applyAnimationSettingsVisibility();
@@ -577,6 +725,10 @@
 
         if (els.toastAnimationDuration) {
             els.toastAnimationDuration.addEventListener('input', () => {
+                if (!draft) {
+                    return;
+                }
+
                 const v = clamp(Number(els.toastAnimationDuration.value), 100, 1000);
                 draft.toastAnimationDurationMs = Math.round(v / 10) * 10;
 
@@ -590,6 +742,10 @@
 
         if (els.bgPickApply) {
             els.bgPickApply.addEventListener('click', () => {
+                if (!draft) {
+                    return;
+                }
+
                 const c = els.bgPicker ? normalizeColor(els.bgPicker.value) : null;
                 if (!c) {
                     return;
@@ -609,6 +765,10 @@
 
         if (els.textPickApply) {
             els.textPickApply.addEventListener('click', () => {
+                if (!draft) {
+                    return;
+                }
+
                 const c = els.textPicker ? normalizeColor(els.textPicker.value) : null;
                 if (!c) {
                     return;
@@ -632,6 +792,22 @@
             });
         }
 
+        if (els.customCss) {
+            els.customCss.addEventListener('input', () => {
+                if (!draft) {
+                    return;
+                }
+                draft.customCss = String(els.customCss.value || '');
+                setDirty(true);
+            });
+        }
+
+        if (els.exportSettings) {
+            els.exportSettings.addEventListener('click', () => {
+                exportSettings();
+            });
+        }
+
         if (els.saveSettings) {
             els.saveSettings.addEventListener('click', () => {
                 save();
@@ -645,42 +821,27 @@
         }
     };
 
-    const getSaveShortcutText = () => {
-        const isMac = navigator.platform.toLowerCase().includes('mac');
-        return isMac ? '⌘+S' : 'Ctrl+S';
-    };
-
-    const applySaveButtonLabel = () => {
-        if (!els.saveLabel) {
-            return;
-        }
-        els.saveLabel.textContent = `設定を保存 ${getSaveShortcutText()}`;
-    };
-
     const bindSaveShortcut = () => {
-        window.addEventListener('keydown', async (e) => {
+        window.addEventListener('keydown', (e) => {
             const key = String(e.key || '').toLowerCase();
-            const isMac = navigator.platform.toLowerCase().includes('mac');
+            const mac = isMac();
 
-            const isSave = key === 's' && (isMac ? e.metaKey : e.ctrlKey);
+            const isSave = key === 's' && (mac ? e.metaKey : e.ctrlKey);
             if (!isSave) {
                 return;
             }
 
-            if (e.repeat) {
-                return;
-            }
-
             e.preventDefault();
-
-            await save();
+            save();
         });
     };
 
     const init = async () => {
+        setSaveLabel();
+        bindTabEvents();
         bindEvents();
         bindSaveShortcut();
-        applySaveButtonLabel();
+        activateTab(activeTabKey);
         await load();
     };
 

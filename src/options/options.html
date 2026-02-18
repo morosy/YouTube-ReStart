@@ -27,6 +27,16 @@
                         <button id="tabAdvanced" class="tab" type="button" data-tab="advanced" aria-selected="false">
                             拡張設定
                         </button>
+                        <button id="tabPrivacy" class="tab" type="button" data-tab="privacy" aria-selected="false">
+                            プライバシー
+                        </button>
+                        <button id="tabTerms" class="tab" type="button"
+                            data-tab="terms" aria-selected="false">
+                            利用規約
+                        </button>
+                        <button id="tabContact" class="tab" type="button" data-tab="contact" aria-selected="false">
+                            お問い合わせ
+                        </button>
                     </aside>
 
                     <div class="content">
@@ -180,6 +190,48 @@
                                     設定を読み込み
                                 </button>
                                 <input id="importFile" type="file" accept="application/json" class="sr-only">
+                            </div>
+                        </div>
+
+                        <!-- Panel: プライバシー -->
+                        <div id="panelPrivacy" class="panel" data-panel="privacy">
+                            <h2 class="panel-title">プライバシーポリシー</h2>
+
+                            <div class="block">
+                                <div id="privacyContent" class="policy-content">読み込み中…</div>
+                            </div>
+                        </div>
+
+                        <!-- Panel: 利用規約 -->
+                        <div id="panelTerms" class="panel" data-panel="terms">
+                            <h2 class="panel-title">利用規約</h2>
+
+                            <div class="block">
+                                <div id="termsContent" class="policy-content">読み込み中…</div>
+                            </div>
+                        </div>
+
+                        <!-- Panel: お問い合わせ -->
+                        <div id="panelContact" class="panel" data-panel="contact">
+                            <h2 class="panel-title">お問い合わせ</h2>
+
+                            <div class="block">
+                                <p class="panel-note">
+                                    ご質問・不具合報告は以下よりお願いいたします。
+                                </p>
+
+                                <div class="contact-box">
+                                    <a href="https://docs.google.com/forms/d/e/1FAIpQLSd0ld01hgH3DqKuKNlX36ibPEaWoqSFrJs3LWxxtmrJJpctxg/viewform?usp=publish-editor"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="btn">
+                                        お問い合わせフォーム
+                                    </a>
+                                </div>
+
+                                <p class="panel-note">
+                                    ※ Chrome Web Store のサポートページからもお問い合わせ可能です。
+                                </p>
                             </div>
                         </div>
 

@@ -46,10 +46,16 @@
         tabBasic: document.getElementById('tabBasic'),
         tabPopup: document.getElementById('tabPopup'),
         tabAdvanced: document.getElementById('tabAdvanced'),
+        tabPrivacy: document.getElementById('tabPrivacy'),
+        tabTerms: document.getElementById('tabTerms'),
+        tabContact: document.getElementById('tabContact'),
 
         panelBasic: document.getElementById('panelBasic'),
         panelPopup: document.getElementById('panelPopup'),
         panelAdvanced: document.getElementById('panelAdvanced'),
+        panelPrivacy: document.getElementById('panelPrivacy'),
+        panelTerms: document.getElementById('panelTerms'),
+        panelContact: document.getElementById('panelContact'),
 
         // Basic
         enabled: document.getElementById('enabled'),
@@ -545,13 +551,19 @@
         const tabButtons = [
             { key: 'basic', el: els.tabBasic },
             { key: 'popup', el: els.tabPopup },
-            { key: 'advanced', el: els.tabAdvanced }
+            { key: 'advanced', el: els.tabAdvanced },
+            { key: 'privacy', el: els.tabPrivacy },
+            { key: 'terms', el: els.tabTerms },
+            { key: 'contact', el: els.tabContact }
         ];
 
         const panels = [
             { key: 'basic', el: els.panelBasic },
             { key: 'popup', el: els.panelPopup },
-            { key: 'advanced', el: els.panelAdvanced }
+            { key: 'advanced', el: els.panelAdvanced },
+            { key: 'privacy', el: els.panelPrivacy },
+            { key: 'terms', el: els.panelTerms },
+            { key: 'contact', el: els.panelContact }
         ];
 
         tabButtons.forEach((t) => {
@@ -711,6 +723,15 @@
         }
         if (els.tabAdvanced) {
             els.tabAdvanced.addEventListener('click', handler);
+        }
+        if (els.tabPrivacy) {
+            els.tabPrivacy.addEventListener('click', handler);
+        }
+        if (els.tabTerms) {
+            els.tabTerms.addEventListener('click', handler);
+        }
+        if (els.tabContact) {
+            els.tabContact.addEventListener('click', handler);
         }
     };
 
@@ -946,6 +967,34 @@
         bindSaveShortcut();
         activateTab(activeTabKey);
         await load();
+        // Load policy/terms external text files
+        try {
+            await loadPolicyText('privacy', 'texts/privacy.txt', 'privacyContent');
+        } catch (e) {
+            // ignore
+        }
+        try {
+            await loadPolicyText('terms', 'texts/terms.txt', 'termsContent');
+        } catch (e) {
+            // ignore
+        }
+    };
+
+    const loadPolicyText = async (key, relPath, containerId) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        try {
+            const res = await fetch(relPath);
+            if (!res.ok) throw new Error('fetch failed');
+            const text = await res.text();
+
+            // Insert as plain text but allow simple headings by splitting
+            container.textContent = text;
+        } catch (e) {
+            console.error('loadPolicyText error', key, e);
+            container.textContent = '読み込みに失敗しました';
+        }
     };
 
     init();

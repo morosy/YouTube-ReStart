@@ -4,6 +4,22 @@ YouTube の動画を **必ず 0:00 から再生**するための Chrome 拡張�
 YouTube の SPA（Single Page Application）構造に対応し，動画遷移時に自動で再生位置をリセットします．  
 
 ---
+## インストール手順
+1. リポジトリをクローン
+    ```
+    # 任意のディレクトリに移動
+    cd [ディレクトリパス]
+
+    # リポジトリをクローン
+    git clone https://github.com/morosy/YouTube-ReStarter.git
+    ```
+
+2. Google Chromeで `chrome://extensions/` へアクセス
+3. デベロッパーモードをオンにする
+4. `パッケージ化されていない拡張機能を読み込む`
+5. `YouTube-ReStarter` ディレクトリを選択
+
+---
 
 ## バージョンについて
 
